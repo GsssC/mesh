@@ -9,9 +9,13 @@ import (
 
 // Connection describes a link between peers.
 // It may be in any state, not necessarily established.
+// 两个实现:
+// 1. LocalConnection
+// 2. remoteConnection
 type Connection interface {
+	// 连接的对端
 	Remote() *Peer
-
+	// 连接的此端
 	getLocal() *Peer
 	remoteTCPAddress() string
 	isOutbound() bool

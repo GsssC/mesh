@@ -86,20 +86,38 @@ func (peer *Peer) String() string {
 //
 // NB: This function should generally be invoked while holding a read lock on
 // Peers and LocalPeer.
+// 构建单播路由表，广度优先算法
+// 假设A - B - C
+//     \    /
+//       D
+// 利用此函数构建节点A的路由表
+// A : UnKnownPeerName
+// B : B, AB直连
+// C : B, AC非直连，A可访问B到C
+// D : D, AD直连
 func (peer *Peer) routes(stopAt *Peer, establishedAndSymmetric bool) (bool, map[PeerName]PeerName) {
 	routes := make(unicastRoutes)
 	routes[peer.Name] = UnknownPeerName
+	// 将本peer加入待处理列表，以本peer为初始节点开始遍历处理
 	nextWorklist := []*Peer{peer}
 	for len(nextWorklist) > 0 {
+		// 从待处理列表获取处理节点
 		worklist := nextWorklist
+		// 排序
 		sort.Sort(listOfPeers(worklist))
+		// BFS，清空待处理列表，此轮遍历时探测到新节点加入到待处理列表中
 		nextWorklist = []*Peer{}
+		// 开始此轮遍历
 		for _, curPeer := range worklist {
 			if curPeer == stopAt {
 				return true, routes
 			}
+			// 每个与当前处理节点相连接的节点都要执行的函数
+			// 1.加入到下一轮的处理列表中
+			// 2.更新路由表
 			curPeer.forEachConnectedPeer(establishedAndSymmetric, routes,
 				func(remotePeer *Peer) {
+					// 将侦测到的节点加入下轮待处理列表
 					nextWorklist = append(nextWorklist, remotePeer)
 					remoteName := remotePeer.Name
 					// We now know how to get to remoteName: the same
@@ -107,12 +125,16 @@ func (peer *Peer) routes(stopAt *Peer, establishedAndSymmetric bool) (bool, map[
 					// the starting peer in which case we know we can
 					// reach remoteName directly.
 					if curPeer == peer {
+						// 当前处理节点是初始节点, 到探测节点的下一跳记录探测到的节点名字
 						routes[remoteName] = remoteName
 					} else {
+						// 当前处理节点非本peer, 下一跳记录当前节点名字
 						routes[remoteName] = routes[curPeer.Name]
 					}
 				})
 		}
+		// Q:没有已访问标志，该算法如何收敛？
+		// A:routes作为已访问标志, routes中含有记录则表示其已经访问过。
 	}
 	return false, routes
 }

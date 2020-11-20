@@ -7,6 +7,7 @@ import (
 	"time"
 )
 
+// map[目的地][下一跳地址]
 type unicastRoutes map[PeerName]PeerName
 type broadcastRoutes map[PeerName][]PeerName
 
@@ -205,6 +206,7 @@ func (r *routes) ensureRecalculated() {
 func (r *routes) run(wait <-chan chan struct{}, action <-chan func()) {
 	for {
 		select {
+		// every 1 hour
 		case <-r.recalcTimer.C:
 			r.clearPendingRecalcFlag()
 			r.calculate()
@@ -230,12 +232,17 @@ func (r *routes) calculate() {
 	r.peers.RLock()
 	r.ourself.RLock()
 	var (
+		// 此路由表的生成，节点间成功互相建立TCP连接的边，视为路径
 		unicast      = r.calculateUnicast(true)
+		// 此路由表的生成，节点间由于网络原因TCP连接断开的边，不视为路径
 		unicastAll   = r.calculateUnicast(false)
 		broadcast    = make(broadcastRoutes)
 		broadcastAll = make(broadcastRoutes)
 	)
+	// 最终获得 braodcast[r.ourself.Name] = []r.ourslef.connections, 其中连接为未断开的连接
+	// 表示收到来自自身的广播包，要把包发送到所有相连(连接未断开）的节点。
 	broadcast[r.ourself.Name] = r.calculateBroadcast(r.ourself.Name, true)
+	// 收到来自自身的广播包，要把包发送到所有相连(即便连接网络断开）的节点。
 	broadcastAll[r.ourself.Name] = r.calculateBroadcast(r.ourself.Name, false)
 	r.ourself.RUnlock()
 	r.peers.RUnlock()
@@ -291,9 +298,13 @@ func (r *routes) calculateBroadcast(name PeerName, establishedAndSymmetric bool)
 	if !found {
 		return hops
 	}
+	// when peer == r.ourself.Peer
 	if found, reached := peer.routes(r.ourself.Peer, establishedAndSymmetric); found {
+		// reached = reached[r.ourself.Peer.Name][UnKnownPeerName]
+		// reached 在下文中表示需要忽略的
 		r.ourself.forEachConnectedPeer(establishedAndSymmetric, reached,
 			func(remotePeer *Peer) { hops = append(hops, remotePeer.Name) })
+		// hops = []PeerName{r.ourself.connections}
 	}
 	return hops
 }
