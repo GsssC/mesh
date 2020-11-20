@@ -23,7 +23,7 @@ type routes struct {
 	broadcastAll  broadcastRoutes // [1]
 	recalcTimer   *time.Timer
 	pendingRecalc bool
-	wait          chan chan struct{}
+	waitRecalc    chan chan struct{}
 	action        chan<- func()
 	// [1] based on *all* connections, not just established &
 	// symmetric ones
@@ -47,7 +47,7 @@ func newRoutes(ourself *localPeer, peers *Peers) *routes {
 		broadcast:    broadcastRoutes{ourself.Name: []PeerName{}},
 		broadcastAll: broadcastRoutes{ourself.Name: []PeerName{}},
 		recalcTimer:  time.NewTimer(time.Hour),
-		wait:         wait,
+		waitRecalc:   wait,
 		action:       action,
 	}
 	r.recalcTimer.Stop()
@@ -195,11 +195,11 @@ func (r *routes) ensureRecalculated() {
 	var done chan struct{}
 	// If another call is already waiting, wait on the same chan, otherwise make a new one
 	select {
-	case done = <-r.wait:
+	case done = <-r.waitRecalc:
 	default:
 		done = make(chan struct{})
 	}
-	r.wait <- done
+	r.waitRecalc <- done
 	<-done
 }
 
