@@ -170,7 +170,7 @@ func (conn *LocalConnection) run(errorChan <-chan error, finished chan<- struct{
 		return
 	}
 
-	intro, err := protocolIntroParams{
+	result, err := protocolIntroParams{
 		MinVersion: conn.router.ProtocolMinVersion,
 		MaxVersion: ProtocolMaxVersion,
 		Features:   conn.makeFeatures(),
@@ -182,11 +182,11 @@ func (conn *LocalConnection) run(errorChan <-chan error, finished chan<- struct{
 		return
 	}
 
-	conn.sessionKey = intro.SessionKey
-	conn.tcpSender = intro.Sender
-	conn.version = intro.Version
+	conn.sessionKey = result.SessionKey
+	conn.tcpSender = result.Sender
+	conn.version = result.Version
 
-	remote, err := conn.parseFeatures(intro.Features)
+	remote, err := conn.parseFeatures(result.Features)
 	if err != nil {
 		return
 	}
@@ -212,7 +212,7 @@ func (conn *LocalConnection) run(errorChan <-chan error, finished chan<- struct{
 		ConnUID:            conn.uid,
 		SessionKey:         sessionKey,
 		SendControlMessage: conn.sendOverlayControlMessage,
-		Features:           intro.Features,
+		Features:           result.Features,
 	}
 	if conn.OverlayConn, err = conn.router.Overlay.PrepareConnection(params); err != nil {
 		return
